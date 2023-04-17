@@ -12,7 +12,9 @@ function loadOBJ(renderer, path, name) {
 			console.log('model ' + Math.round(percentComplete, 2) + '% downloaded');
 		}
 	}
-	function onError() { }
+	function onError(err) {
+		console.error( 'An error happened:' , err);
+	 }
 
 	new THREE.MTLLoader(manager)
 		.setPath(path)
