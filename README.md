@@ -39,7 +39,17 @@ class EmissiveMaterial{
 	vec color;
 }
 
+class PhongMaterial{
+	
+}
+
+class ShadowMaterial{
+	
+}
+
 Material<|--EmissiveMaterial
+Material<|--PhongMaterial
+Material<|--ShadowMaterial
 
 class Shader{
 	webGl gl;
@@ -51,6 +61,7 @@ class Shader{
 	+ glProgram linkShader(vs, fs);
 	+ addShaderLocations(result, shaderLocation);
 }
+
 class Texture{
 	+ glTexture texture;
 	+ float w;
@@ -58,9 +69,22 @@ class Texture{
 	+ float format;
 }
 
+class FrameBufferObject{
+	FrameBuffer framebuffer;
+}
+
 class PointLight{
 	Mesh cube;
 	EmissiveMaterial mat;
+}
+
+class DirectionalLight{
+	+ vec3 lightpos;
+	+ vec3 focalPoint;
+	+ vec3 lightUp;
+	+ bool hasShadowMap;
+	+ FrameBufferObject fbo;
+	+ Matrix CalcLightMVP(translate, scale);
 }
 
 class MeshRenderer{
@@ -85,10 +109,12 @@ class WebGLRenderer{
 
 WebGLRenderer o-- MeshRenderer
 WebGLRenderer o-- PointLight
+WebGLRenderer o-- DirectionalLight
 WebGLRenderer o-- PerspectiveCamera
 
 MeshRenderer *-- Mesh 
 Material o-- Texture
+Material o-- FrameBufferObject
 MeshRenderer *-- Material
 MeshRenderer *-- Shader
 ```
@@ -185,79 +211,70 @@ function GAMES202Main()
 }
 ```
 
-Uniform的绑定
+#### Uniform的绑定
 
-```c
-const PhongVertexShader = `
-attribute vec3 aVertexPosition;
-attribute vec3 aNormalPosition;
-attribute vec2 aTextureCoord;
+#### 阴影流程
 
-uniform mat4 uModelViewMatrix;
-uniform mat4 uProjectionMatrix;
-
-varying highp vec3 vFragPos;
-varying highp vec3 vNormal;
-varying highp vec2 vTextureCoord;
-
-void main(void) {
-
-  vFragPos = aVertexPosition;
-  vNormal = aNormalPosition;
-
-  gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aVertexPosition, 1.0);
-
-  vTextureCoord = aTextureCoord;
-
+```javascript
+function GAMES202Main()
+{
+    // 添加产生阴影的光源信息
+	let lightPos = [0, 80, 80];
+	let focalPoint = [0, 0, 0];
+	let lightUp = [0, 1, 0]
+	const directionLight = new DirectionalLight(5000, [1, 1, 1], lightPos, focalPoint, lightUp, true, renderer.gl);
+    {
+        // 创建shadowMap的FrameBuffer
+        this.fbo = new FBO(gl);
+    }
+	renderer.addLight(directionLight);
+   
+    function loadOBJ(renderer, path, name, objMaterial, transform)
+    {
+        // 创建着色材质和Shadow材质
+        material = buildPhongMaterial(colorMap, mat.specular, light, Translation, Scale, "phongVertex.glsl", "phongFragment.glsl");
+        {
+            // 将light的FBO对象绑定到shader的uShadowMap上
+        }
+        shadowMaterial = buildShadowMaterial(light, Translation, Scale, "shadowVertex.glsl", "shadowFragment.glsl");
+        {
+            // 计算lightMVP
+            let lightMVP = light.CalcLightMVP(translate, scale);
+            
+            // 将light的FBO对象绑定到材质的frameBuffer上
+        }
+        
+        //添加模型和阴影模型
+        let meshRender = new MeshRender(renderer.gl, mesh, data);
+        renderer.addMeshRender(meshRender);
+        let shadowMeshRender = new MeshRender(renderer.gl, mesh, data);
+        renderer.addShadowMeshRender(shadowMeshRender);
+    }
+    
+    WebGLRenderer.render() 
+    {
+        // light pass
+        this.shadowMeshes[i].draw(this.camera);
+        {
+            // 将当前渲染的Target绑定为shadowMap的frameBuffer,以便shadow渲染
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.material.frameBuffer);
+            gl.viewport(0.0, 0.0, resolution, resolution);
+        }
+        
+        // scene pass
+        this.meshes[i].draw(this.camera);
+        {
+            this.bindMaterialParameters();
+            {
+                // 绑定fbo到uShadowMap上
+            }
+        }
+    }
 }
-`;
-
-const PhongFragmentShader = `
-#ifdef GL_ES
-precision mediump float;
-#endif
-
-uniform vec3 uKd;
-uniform vec3 uKs;
-
-uniform float uLightIntensity;
-
-uniform int uTextureSample;
-uniform sampler2D uSampler;
-uniform vec3 uLightPos;
-uniform vec3 uCameraPos;
-
-varying highp vec3 vFragPos;
-varying highp vec3 vNormal;
-varying highp vec2 vTextureCoord;
-
-void main(void) {
-  vec3 color;
-
-  if (uTextureSample == 1) {
-    color = texture2D(uSampler, vTextureCoord).rgb;
-    color = pow(color, vec3(2.2))
-  } else {
-    color = uKd;
-  }
-
-  vec3 l = uLightPos - vFragPos;
-  float len = lenght(l);
-  l = nomalize(l);
-  vec3 v = normalize(uCameraPos - vFragPos);
-  vec3 n = normalize(vNormal);
-  vec3 h = normalize(v + l);
-  
-  float atten_off = uLightIntensity / len ;
-
-  vec3 amibient = 0.05 * color;
-  vec3 diffuse = color * atten_off * max(dot(n, l), 0.0);
-  vec3 specular = uks * atten_off * pow(max(dot(n, h), 0.0), 35.0)
-
-  vec3 glcolor = pow(amibient+diffuse+specular, vec3(1/2.2));
-
-  gl_FragColor = vec4(glcolor,1);;
-}
-`;
 ```
 
+#### 问题
+
+1. 采样shadowMap的纹理坐标的计算
+
+   阴影贴图是在light空间下渲染的，所以相机空间下看到的shadingPoint需要转换到light空间下，这样才能在shadowmap上采样出正确的深度。其次采样的uv坐标也应该是shadowMap空间的uv坐标。shadingPoint的位置乘以lightMVP之后，将其转换到了裁剪空间下，还需要进行到NDC坐标的转换，首先得做透视除法，转换到了NDC空间下，也即坐标范围到了-1.0~1.0，必须要再做一次转换将其映射到0-1，适应纹理坐标是0-1之间的要求
