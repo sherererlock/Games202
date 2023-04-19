@@ -87,8 +87,31 @@ float findBlocker( sampler2D shadowMap,  vec2 uv, float zReceiver ) {
 	return 1.0;
 }
 
+float Bias(float depthCtr)
+{
+  vec3 lightDir = normalize(uLightPos - vFragPos);
+  vec3 normal = normalize(vNormal);
+  float m = 300.0 / 2048.0 / 2.0; //正交矩阵宽高/shadowMapSize/2
+  float bias = max(m, m * (1.0 - dot(normal, lightDir))) * depthCtr;
+
+  return bias;
+}
+
 float PCF(sampler2D shadowMap, vec4 coords) {
-  return 1.0;
+  float bias = Bias(0.15);
+  uniformDiskSamples(coords.xy);
+  poissonDiskSamples(coords.xy);
+  float shadow = 0.0;
+  float filteringSize = 10.0 / 2048.0;
+  for(int i = 0; i < NUM_SAMPLES; i ++)
+  {
+    vec2 texcoords =  coords.xy + poissonDisk[i] * filteringSize;
+    vec4 rgbaDepth = texture2D(shadowMap, texcoords);
+    float depth = unpack(rgbaDepth);
+    shadow += (depth+EPS < coords.z - bias ? 0.0 : 1.0);
+  }
+
+  return shadow / float(NUM_SAMPLES);
 }
 
 float PCSS(sampler2D shadowMap, vec4 coords){
@@ -103,11 +126,11 @@ float PCSS(sampler2D shadowMap, vec4 coords){
 
 }
 
-
 float useShadowMap(sampler2D shadowMap, vec4 shadowCoord){
+  float bias = Bias(0.15);
   vec4 rgbaDepth = texture2D(shadowMap, shadowCoord.xy);
   float depth = unpack(rgbaDepth);
-  float shadow = depth + 0.001 < shadowCoord.z ? 0.0 : 1.0;
+  float shadow = depth + bias < shadowCoord.z ? 0.0 : 1.0;
 
   return shadow;
 }
@@ -139,9 +162,9 @@ void main(void) {
 
   float visibility;
   vec3 shadowCoord = vPositionFromLight.xyz / vPositionFromLight.w;
-  shadowCoord.xyz = (shadowCoord.xyz + 1.0) / 2.0;
-  visibility = useShadowMap(uShadowMap, vec4(shadowCoord, 1.0));
-  //visibility = PCF(uShadowMap, vec4(shadowCoord, 1.0));
+  shadowCoord.xyz = (shadowCoord.xyz * 0.5 + 0.5);
+  // visibility = useShadowMap(uShadowMap, vec4(shadowCoord, 1.0));
+  visibility = PCF(uShadowMap, vec4(shadowCoord, 1.0));
   //visibility = PCSS(uShadowMap, vec4(shadowCoord, 1.0));
 
   vec3 phongColor = blinnPhong();
