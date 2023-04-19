@@ -259,6 +259,15 @@ function GAMES202Main()
             // 将当前渲染的Target绑定为shadowMap的frameBuffer,以便shadow渲染
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.material.frameBuffer);
             gl.viewport(0.0, 0.0, resolution, resolution);
+            
+            //vertex shader
+            // 使用计算出的LightMVP转换顶点的pos
+            
+            //透视除法到ndc，视图变换到图像空间，得到pos
+            //插值得到每个fragment的pos
+            
+            //fragment shader
+            //将每个fragment的pos pack成rgba写入到fbo中,生成shadowmap
         }
         
         // scene pass
@@ -267,7 +276,17 @@ function GAMES202Main()
             this.bindMaterialParameters();
             {
                 // 绑定fbo到uShadowMap上
+                // 绑定lightMVP到shader变量uLightMVP上
             }
+            
+            // vertex shader
+            // 计算出当前顶点在light空间下的投影位置vPositionFromLight
+            
+            // 插值得到每个frament的vPositionFromLight
+            
+            // fragemt shader
+            // 对shadingpoint的vPositionFromLight做透视除法和视图变换,得到视图空间下的位置和深度
+            // 拿位置采样shadowmap得到深度，与当前shadingpoint在light空间下的深度做对比。
         }
     }
 }
@@ -278,3 +297,32 @@ function GAMES202Main()
 1. 采样shadowMap的纹理坐标的计算
 
    阴影贴图是在light空间下渲染的，所以相机空间下看到的shadingPoint需要转换到light空间下，这样才能在shadowmap上采样出正确的深度。其次采样的uv坐标也应该是shadowMap空间的uv坐标。shadingPoint的位置乘以lightMVP之后，将其转换到了裁剪空间下，还需要进行到NDC坐标的转换，首先得做透视除法，转换到了NDC空间下，也即坐标范围到了-1.0~1.0，必须要再做一次转换将其映射到0-1，适应纹理坐标是0-1之间的要求
+
+#### PCF
+
+均匀圆盘采样
+圆的面积为$\pi*r^2$, 圆环的面积为$\pi*(r_1^2 - r_2^2)$ ,在增加$\Delta r$时，极限情况下，圆环的面积为$\pi*((r+\Delta r)^2 - r^2)$ ,即是周长$2\pi r$，极坐标下，在角度均匀随机的情况下，同样的$\Delta r$会因为r的大小不同而导致面积不同，面积越大，采样的概率越大，所以概率密度就不均匀了。那么对r的均匀采样应该与面积线性相关，也就是对$r^2$进行均匀采样。
+
+```c++
+void uniformDiskSamples( const in vec2 randomSeed ) {
+
+  float randNum = rand_2to1(randomSeed);
+  float sampleX = rand_1to1( randNum ) ;
+  float sampleY = rand_1to1( sampleX ) ;
+
+  float angle = sampleX * PI2;
+  float radius = sqrt(sampleY);
+
+  for( int i = 0; i < NUM_SAMPLES; i ++ ) {
+    poissonDisk[i] = vec2( radius * cos(angle) , radius * sin(angle)  );
+
+    sampleX = rand_1to1( sampleY ) ;
+    sampleY = rand_1to1( sampleX ) ;
+
+    angle = sampleX * PI2;
+    radius = sqrt(sampleY);
+  }
+}
+```
+
+泊松圆盘采样
