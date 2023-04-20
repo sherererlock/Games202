@@ -104,12 +104,13 @@ float findBlocker( sampler2D shadowMap,  vec2 uv, float zReceiver ) {
   float stride = 1.0;
   float filteringRange = stride / textureSize * filterSize;
 
+  float bias = Bias(0.15);
   for(int i = 0; i < BLOCKER_SEARCH_NUM_SAMPLES; i ++)
   {
     vec2 coords = uv + poissonDisk[i] * filteringRange;
     vec4 rgbaDepth = texture2D(shadowMap, coords);
     float depth = unpack(rgbaDepth);
-    if(zReceiver> depth)
+    if(zReceiver - bias> depth)
     {
       blockerDepth += depth;
       blockerCount ++; 
