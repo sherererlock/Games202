@@ -55,7 +55,7 @@ function GAMES202Main() {
 	const directionLight1 = new DirectionalLight(5000, [1, 1, 1], lightPos1, focalPoint1, lightUp1, true, renderer.gl);
 
 	renderer.addLight(directionLight);
-	renderer.addLight(directionLight1);
+	// renderer.addLight(directionLight1);
 
 	// Add shapes
 	
