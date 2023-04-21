@@ -49,6 +49,7 @@ function loadOBJ(renderer, path, name, objMaterial, transform) {
 							let Translation = [transform.modelTransX, transform.modelTransY, transform.modelTransZ];
 							let Scale = [transform.modelScaleX, transform.modelScaleY, transform.modelScaleZ];
 
+							// todo:多光源
 							let light = renderer.lights[0].entity;
 							switch (objMaterial) {
 								case 'PhongMaterial':
