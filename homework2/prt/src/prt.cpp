@@ -218,6 +218,8 @@ public:
                     // TODO: 此处你需要计算给定方向下的shadowed传输项球谐函数值
                     return 0;
                 }
+
+                return 0;
             };
             auto shCoeff = sh::ProjectFunction(SHOrder, shFunc, m_SampleCount);
             for (int j = 0; j < shCoeff->size(); j++)

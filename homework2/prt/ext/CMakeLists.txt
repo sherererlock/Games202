@@ -37,6 +37,16 @@ if (APPLE)
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  CHECK_CXX_COMPILER_FLAG("-std=c++14" HAS_CPP14_FLAG)
+  CHECK_CXX_COMPILER_FLAG("-std=c++11" HAS_CPP11_FLAG)
+
+  if (HAS_CPP14_FLAG)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+  elseif (HAS_CPP11_FLAG)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+  else()
+    message(FATAL_ERROR "Unsupported compiler -- Nori requires C++11 support!")
+  endif()
 
   # Prefer libc++ in conjunction with Clang
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -171,6 +181,8 @@ set(NANOGUI_INCLUDE_DIR
   ${CMAKE_CURRENT_SOURCE_DIR}/nanogui/include)
 set(EIGEN_INCLUDE_DIR
   ${CMAKE_CURRENT_SOURCE_DIR}/eigen)
+set(SH_INCLUDE_DIRS
+  ${CMAKE_CURRENT_SOURCE_DIR}/spherical-harmonics)
 set(TBB_INCLUDE_DIR
   ${CMAKE_CURRENT_SOURCE_DIR}/tbb/include)
 set(FILESYSTEM_INCLUDE_DIR
@@ -208,7 +220,8 @@ set(CompilerFlags
       NANOVG_INCLUDE_DIR NANOGUI_EXTRA_INCS NANOGUI_EXTRA_DEFS
 	    NANOGUI_EXTRA_LIBS NANOGUI_INCLUDE_DIR EIGEN_INCLUDE_DIR
       STB_IMAGE_WRITE_INCLUDE_DIR TBB_INCLUDE_DIR
-      FILESYSTEM_INCLUDE_DIR PUGIXML_INCLUDE_DIR
+      FILESYSTEM_INCLUDE_DIR PUGIXML_INCLUDE_DIR 
+      SH_INCLUDE_DIRS
 )
 foreach(CompilerFlag ${CompilerFlags})
   set(${CompilerFlag} "${${CompilerFlag}}" PARENT_SCOPE)
