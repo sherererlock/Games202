@@ -2,6 +2,18 @@
     This file is part of Nori, a simple educational ray tracer
 
     Copyright (c) 2015 by Wenzel Jakob
+
+    Nori is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License Version 3
+    as published by the Free Software Foundation.
+
+    Nori is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #pragma once
@@ -10,6 +22,10 @@
 
 NORI_NAMESPACE_BEGIN
 
+static constexpr uint32_t MAX_TRIANGLES_PER_NODE = 15;
+static constexpr uint32_t MAX_RECURSION_DEPTH = 10;
+static constexpr uint32_t MAX_NUM_MESHES = 32;
+
 /**
  * \brief Acceleration data structure for ray intersection queries
  *
@@ -17,7 +33,26 @@ NORI_NAMESPACE_BEGIN
  * through the geometry.
  */
 class Accel {
+
+    struct Node {
+        uint32_t num_triangles = 0;
+        BoundingBox3f bbox;
+        Node* next = nullptr;
+        Node* child = nullptr;
+        uint32_t* triangle_indices = nullptr;
+        uint32_t* mesh_indices = nullptr;
+
+        ~Node() {
+            delete[] triangle_indices;
+            delete[] mesh_indices;
+            delete next;
+            delete child;
+        }
+    };
+
 public:
+    ~Accel() { delete m_root; }
+
     /**
      * \brief Register a triangle mesh for inclusion in the acceleration
      * data structure
@@ -54,8 +89,22 @@ public:
     bool rayIntersect(const Ray3f &ray, Intersection &its, bool shadowRay) const;
 
 private:
-    Mesh         *m_mesh = nullptr; ///< Mesh (only a single one for now)
+    Node* buildRecursive(const BoundingBox3f& bbox, std::vector<uint32_t>& triangle_indices,
+            std::vector<uint32_t>& mesh_indices, uint32_t recursion_depth);
+    bool traverseRecursive(const Node& node, Ray3f &ray, Intersection &its, bool shadowRay, uint32_t& hit_idx) const;
+    static void subdivideBBox(const BoundingBox3f& parent, BoundingBox3f* bboxes);
+
+    Mesh*         m_meshes[MAX_NUM_MESHES]; ///< Meshes (up to MAX_NUM_MESHES meshes)
     BoundingBox3f m_bbox;           ///< Bounding box of the entire scene
+    Node*         m_root = nullptr; ///< Root node of Octree
+    uint32_t      m_num_meshes = 0; ///< number of meshes in accel
+
+    // only statistics
+    uint32_t m_num_nonempty_leaf_nodes = 0;
+    uint32_t m_num_leaf_nodes = 0;
+    uint32_t m_num_nodes = 0;
+    uint32_t m_recursion_depth = 0;
+    uint32_t m_num_triangles_saved = 0;
 };
 
 NORI_NAMESPACE_END
