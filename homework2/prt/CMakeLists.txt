@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.2)
+cmake_minimum_required (VERSION 3.8)
 project(nori)
 
 add_subdirectory(ext ext_build)
@@ -33,8 +33,6 @@ include_directories(
   SYSTEM ${FILESYSTEM_INCLUDE_DIR}
   # STB Image Write
   SYSTEM ${STB_IMAGE_WRITE_INCLUDE_DIR}
-
-  SYSTEM ${SH_INCLUDE_DIRS}
 )
 
 # The following lines build the main executable. If you add a source
@@ -90,9 +88,6 @@ add_executable(nori
   src/microfacet.cpp
   src/mirror.cpp
   src/dielectric.cpp
-  src/prt.cpp
-  ext/spherical-harmonics/sh/spherical_harmonics.cc
-  ext/spherical-harmonics/sh/default_image.cc
 )
 
 add_definitions(${NANOGUI_EXTRA_DEFS})
@@ -109,9 +104,9 @@ add_executable(warptest
 )
 
 if (WIN32)
-  target_link_libraries(nori tbb_static pugixml IlmImf nanogui  ${NANOGUI_EXTRA_LIBS} zlibstatic)
+  target_link_libraries(nori tbb_static pugixml IlmImf nanogui ${NANOGUI_EXTRA_LIBS} zlibstatic)
 else()
-  target_link_libraries(nori tbb_static pugixml IlmImf nanogui  ${NANOGUI_EXTRA_LIBS})
+  target_link_libraries(nori tbb_static pugixml IlmImf nanogui ${NANOGUI_EXTRA_LIBS})
 endif()
 
 target_link_libraries(warptest tbb_static nanogui ${NANOGUI_EXTRA_LIBS})

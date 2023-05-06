@@ -2,18 +2,6 @@
     This file is part of Nori, a simple educational ray tracer
 
     Copyright (c) 2015 by Wenzel Jakob
-
-    Nori is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License Version 3
-    as published by the Free Software Foundation.
-
-    Nori is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <nori/warp.h>
@@ -410,8 +398,8 @@ public:
 
     WarpTestScreen(): Screen(Vector2i(800, 600), "warptest: Sampling and Warping"), m_bRec(nori::Vector3f()) {
         inc_ref();
-        initializeGUI();
         m_drawHistogram = false;
+        initializeGUI();
     }
 
     static float mapParameter(WarpType warpType, float parameterValue) {
