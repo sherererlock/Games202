@@ -90,6 +90,7 @@ add_executable(nori
   src/microfacet.cpp
   src/mirror.cpp
   src/dielectric.cpp
+  src/normals.cpp
   src/prt.cpp
   ext/spherical-harmonics/sh/spherical_harmonics.cc
   ext/spherical-harmonics/sh/default_image.cc

@@ -126,9 +126,23 @@ namespace ProjEnv
                     // TODO: here you need to compute light sh of each face of cubemap of each pixel
                     // TODO: 此处你需要计算每个像素下cubemap某个面的球谐系数
                     Eigen::Vector3f dir = cubemapDirs[i * width * height + y * width + x];
+
                     int index = (y * width + x) * channel;
                     Eigen::Array3f Le(images[i][index + 0], images[i][index + 1],
                                       images[i][index + 2]);
+
+					float wOmege = CalcArea(x, y, width, height);
+
+					for (int l = 0; l <= SHOrder; l++)
+					{
+						for (int m = -l; m <= l; m++)
+						{
+							int k = sh::GetIndex(l, m);
+							double basisFunc = sh::EvalSH(l, m, dir.cast<double>().normalized());
+
+							SHCoeffiecents[k] += Le * wOmege * basisFunc;
+						}
+					}
                 }
             }
         }
@@ -206,25 +220,34 @@ public:
             auto shFunc = [&](double phi, double theta) -> double {
                 Eigen::Array3d d = sh::ToVector(phi, theta);
                 const auto wi = Vector3f(d.x(), d.y(), d.z());
+                double H = wi.dot(n);
                 if (m_Type == Type::Unshadowed)
                 {
                     // TODO: here you need to calculate unshadowed transport term of a given direction
                     // TODO: 此处你需要计算给定方向下的unshadowed传输项球谐函数值
-                    return 0;
+                    
+                    return H > 0 ? H : 0;
                 }
                 else
                 {
-                    // TODO: here you need to calculate shadowed transport term of a given direction
-                    // TODO: 此处你需要计算给定方向下的shadowed传输项球谐函数值
+                    Ray3f ray(v, wi.normalized());
+
+                    if (H > 0 && !scene->rayIntersect(ray))
+                    {
+                        return H;
+                    }
+
                     return 0;
                 }
 
                 return 0;
             };
+            // 投影transport
+
             auto shCoeff = sh::ProjectFunction(SHOrder, shFunc, m_SampleCount);
             for (int j = 0; j < shCoeff->size(); j++)
             {
-                m_TransportSHCoeffs.col(i).coeffRef(j) = (*shCoeff)[j];
+                m_TransportSHCoeffs.col(i).coeffRef(j) = (*shCoeff)[j] / M_PI;
             }
         }
         if (m_Type == Type::Interreflection)
@@ -277,10 +300,10 @@ public:
         // TODO: you need to delete the following four line codes after finishing your calculation to SH,
         //       we use it to visualize the normals of model for debug.
         // TODO: 在完成了球谐系数计算后，你需要删除下列四行，这四行代码的作用是用来可视化模型法线
-        if (c.isZero()) {
-            auto n_ = its.shFrame.n.cwiseAbs();
-            return Color3f(n_.x(), n_.y(), n_.z());
-        }
+        //if (c.isZero()) {
+        //    auto n_ = its.shFrame.n.cwiseAbs();
+        //    return Color3f(n_.x(), n_.y(), n_.z());
+        //}
         return c;
     }
 
