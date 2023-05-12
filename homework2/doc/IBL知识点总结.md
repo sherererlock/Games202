@@ -213,6 +213,10 @@ float4 ImportanceSampleGGX( float2 E, float a2 )
 
 ### 漫反射部分
 
+#### IrradianceMap
+
+#### Spherical Harmonics
+
 
 
 ### 镜面反射部分
