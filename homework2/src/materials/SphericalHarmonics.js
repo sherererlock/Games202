@@ -6,19 +6,20 @@ class SphericalHarmonicsMaterial extends Material {
 
         super({
             // Phong
-
-            'uLightMVP': { type: 'matrix4fv', value: lightMVP },
+            'uPrecomputeL[0]': { type: 'precomputeL', value: null},
+            'uPrecomputeL[1]': { type: 'precomputeL', value: null},
+            'uPrecomputeL[2]': { type: 'precomputeL', value: null},
 
         }, ['aPrecomputeLT'], vertexShader, fragmentShader, null);
     }
 }
 
-async function buildSphericalHarmonicsMaterial(color, specular, light, translate, scale, vertexPath, fragmentPath) {
+async function buildSphericalHarmonicsMaterial(vertexPath, fragmentPath) {
 
 
     let vertexShader = await getShaderString(vertexPath);
     let fragmentShader = await getShaderString(fragmentPath);
 
-    return new SphericalHarmonicsMaterial(color, specular, light, translate, scale, vertexShader, fragmentShader);
+    return new SphericalHarmonicsMaterial(vertexShader, fragmentShader);
 
 }

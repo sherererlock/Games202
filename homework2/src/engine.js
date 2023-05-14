@@ -114,7 +114,9 @@ async function GAMES202Main() {
 	}
 
 	// TODO: load model - Add your Material here
-	loadOBJ(renderer, 'assets/mary/', 'mary', 'SphericalHarmonics', boxTransform);
+	let maryTransform = setTransform(0, -35, 0, 20, 20, 20);
+
+	loadOBJ(renderer, 'assets/mary/', 'mary', 'SphericalHarmonics', maryTransform);
 	// loadOBJ(renderer, 'assets/bunny/', 'bunny', 'addYourPRTMaterial', box2Transform);
 
 	function createGUI() {

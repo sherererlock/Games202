@@ -60,8 +60,7 @@ function loadOBJ(renderer, path, name, objMaterial, transform) {
 								// TODO: Add your PRTmaterial here
 
 								case 'SphericalHarmonics':
-									material = buildPhongMaterial(colorMap, mat.specular.toArray(), light, Translation, Scale, "./src/shaders/phongShader/phongVertex.glsl", "./src/shaders/phongShader/phongFragment.glsl");
-									shadowMaterial = buildShadowMaterial(light, Translation, Scale, "./src/shaders/shadowShader/shadowVertex.glsl", "./src/shaders/shadowShader/shadowFragment.glsl");
+									material = buildSphericalHarmonicsMaterial("./src/shaders/sphericalHarmonicsShader/sphericalHarmonicsVertex.glsl", "./src/shaders/sphericalHarmonicsShader/sphericalHarmonicsFragment.glsl");
 									break;								
 
 								case 'SkyBoxMaterial':
