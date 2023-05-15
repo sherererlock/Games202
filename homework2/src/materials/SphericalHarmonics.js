@@ -1,9 +1,6 @@
 class SphericalHarmonicsMaterial extends Material {
 
-    constructor(color, specular, light, translate, scale, vertexShader, fragmentShader) {
-        let lightMVP = light.CalcLightMVP(translate, scale);
-        let lightIntensity = light.mat.GetIntensity();
-
+    constructor(vertexShader, fragmentShader) {
         super({
             // Phong
             'uPrecomputeL[0]': { type: 'precomputeL', value: null},

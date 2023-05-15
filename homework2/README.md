@@ -228,23 +228,19 @@ function GAMES202Main()
 2. 在meshRender中使用API将顶点属性传入到shader中
 
    ```javascript
-   		if (this.mesh.hasNormals) {
-   			const numComponents = 3;
-   			const type = gl.FLOAT;
-   			const normalize = false;
-   			const stride = 0;
-   			const offset = 0;
-   			gl.bindBuffer(gl.ARRAY_BUFFER, this.#normalBuffer);
-   			gl.vertexAttribPointer(
-   				this.shader.program.attribs[this.mesh.normalsName],
-   				numComponents,
-   				type,
-   				normalize,
-   				stride,
-   				offset);
-   			gl.enableVertexAttribArray(
-   				this.shader.program.attribs[this.mesh.normalsName]);
-   		}
+   // Bind attribute mat3 - LT
+   // 创建buffer
+   // 绑定buffer
+   // 写入buffer Data
+   const buf = gl.createBuffer();
+   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(precomputeLT[guiParams.envmapId]), gl.STATIC_DRAW);
+   
+   // buffer 属性
+   for (var ii = 0; ii < 3; ++ii) {
+       gl.enableVertexAttribArray(this.shader.program.attribs['aPrecomputeLT'] + ii);
+       gl.vertexAttribPointer(this.shader.program.attribs['aPrecomputeLT'] + ii, 3, gl.FLOAT, false, 36, ii * 12);
+   }
    ```
 
 #### Uniform的绑定
@@ -300,4 +296,145 @@ function GAMES202Main()
    		}
    ```
 
+   #### 实现
    
+   对于Light函数来说，只有9个Vector3，与具体的顶点无关，所以可以当作Uniform传入。
+   对于Transport函数来说，每个顶点都有9个系数，所以当作Attribute传入。
+   
+   light函数
+   
+   1. 读入参数
+   
+      ```javascript
+      /*
+      1.1977 1.60291 2.37536
+      0.058533 0.0122304 -0.049865
+      0.0168805 0.0074171 -0.00583072
+      -0.188584 -0.181485 -0.141815
+      -0.045244 -0.03994 -0.0224991
+      -0.0431019 -0.0421153 -0.0376654
+      0.155307 0.15568 0.161365
+      -0.0638864 -0.052282 -0.0260421
+      0.492288 0.452274 0.376647
+      */
+      precomputeL = [
+          // GraceCathedral
+          [0] =  []
+          // Indoor
+          [1] =  []
+          // Skybox
+          [2] =  []
+      ]
+      ```
+   
+   2. 每帧绑定到uniformbuffer中
+   
+      - shader中的定义
+   
+        ```c
+        uniform mat3 uPrecomputeL[3];
+        ```
+   
+      - 将precomputeL中的数组组成Mat（以1列为一个矩阵）
+   
+      - 传入到shader uniform中
+   
+        ```javascript
+        let mat3value = getMat3ValueFromRGB(precomputeL[guiParams.envmapId]);
+        for(let j = 0; j < 3; u++)
+        {
+        	if(k == "uPrecomputeL["+j+"]")
+        	{
+        		gl.uniform3fv(this.meshs[i].shader.program.uniforms[k], false, mat3value[j]);
+        	}
+        }
+        ```
+   
+   transport函数
+   
+   1. 读入参数
+   
+      ```javascript
+      /*
+      0.237564 0.168931 0.211381 -0.117442 -0.102071 0.142967 0.0438758 -0.0644268 0.0153399 
+      0.223138 0.132852 0.193238 -0.152764 -0.0725009 0.102351 0.0330102 -0.109226 0.0428689 
+      0.20074 0.155726 0.189029 -0.0660841 -0.0438276 0.145367 0.0394032 -0.0323416 -0.0189922 
+      0.190699 0.149202 0.164722 -0.115262 -0.0648439 0.14193 0.00499147 -0.0812827 -0.0145762 
+      ...
+      */
+      
+      precomputeLT[i] = [
+          0.237564, 0.168931 0.211381 -0.117442 -0.102071 0.142967 0.0438758 -0.0644268 0.0153399
+          0.223138 0.132852 0.193238 -0.152764 -0.0725009 0.102351 0.0330102 -0.109226 0.0428689 
+          //...
+      ]
+      ```
+   
+   2. 传入到GPU作为顶点属性
+   
+      ```javascript
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(precomputeLT[guiParams.envmapId]), gl.STATIC_DRAW);
+      
+      for (var ii = 0; ii < 3; ++ii) {
+          gl.enableVertexAttribArray(this.shader.program.attribs['aPrecomputeLT'] + ii);
+          gl.vertexAttribPointer(this.shader.program.attribs['aPrecomputeLT'] + ii, 3, gl.FLOAT, false, 36, ii * 12);
+      }
+      
+      /*
+      [0.237564, 0.168931 0.211381
+      -0.117442 -0.102071 0.142967 
+      0.0438758 -0.0644268 0.0153399]
+      
+      void gl.vertexAttribPointer(index, size, type, normalized, stride, offset);
+      index
+      指定要修改的顶点属性的索引
+      size
+      指定每个顶点属性的组成数量，必须是1，2，3或4。
+      type
+      指定数组中每个元素的数据类型
+      normalized
+      当转换为浮点数时是否应该将整数数值归一化到特定的范围
+      stride
+      一个GLsizei，以字节为单位指定连续顶点属性开始之间的偏移量(即数组中一行长度)。不能大于255。如果stride为0，则假定该属性是紧密打包的，即不交错属性，每个属性在一个单独的块中，下一个顶点的属性紧跟当前顶点之后。
+      offset
+      GLintptr (en-US)指定顶点属性数组中第一部分的字节偏移量。必须是类型的字节长度的倍数
+      */
+      ```
+
+Shader中计算
+
+```c
+/*
+1.1977 1.60291 2.37536
+0.058533 0.0122304 -0.049865
+0.0168805 0.0074171 -0.00583072
+-0.188584 -0.181485 -0.141815
+-0.045244 -0.03994 -0.0224991
+-0.0431019 -0.0421153 -0.0376654
+0.155307 0.15568 0.161365
+-0.0638864 -0.052282 -0.0260421
+0.492288 0.452274 0.376647
+*/
+/*
+[0.237564, 0.168931 0.211381
+-0.117442 -0.102071 0.142967 
+0.0438758 -0.0644268 0.0153399]
+*/
+
+/*
+(1.1977 1.60291 2.37536)* 0.237564
+*/
+
+/*
+(1.1977, 0.058533, 0.0168805) * (0.237564, 0.168931 0.211381)
+*/
+
+attribute highp mat3 aPrecomputeLT;
+uniform mat3 uPrecomputeL[3];
+varying highp vec3 vColor;
+
+vColor = 
+```
+
