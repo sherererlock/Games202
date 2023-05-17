@@ -136,6 +136,9 @@ async function GAMES202Main() {
 		requestAnimationFrame(mainLoop);
 	}
 	requestAnimationFrame(mainLoop);
+	console.log("-------------")
+	console.log(precomputeL[guiParams.envmapId])
+	console.log("-------------")
 }
 
 function setTransform(t_x, t_y, t_z, s_x, s_y, s_z) {

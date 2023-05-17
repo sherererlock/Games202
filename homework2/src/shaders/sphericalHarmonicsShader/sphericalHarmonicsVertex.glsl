@@ -43,10 +43,10 @@ void main(void) {
   gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix *
                 vec4(aVertexPosition, 1.0);
 
-  // for(int i = 0; i < 3; i++)
-  // {
-  //   vColor[i] = L_dot_LT(aPrecomputeLT, uPrecomputeL[i]);
-  // }                
+  for(int i = 0; i < 3; i++)
+  {
+    vColor[i] = L_dot_LT(aPrecomputeLT, uPrecomputeL[i]);
+  }                
 
-  vColor = SHrecon(uPrecomputeL[0], uPrecomputeL[1], uPrecomputeL[2], aPrecomputeLT);
+  // vColor = SHrecon(uPrecomputeL[0], uPrecomputeL[1], uPrecomputeL[2], aPrecomputeLT);
 }

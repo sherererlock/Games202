@@ -12,14 +12,17 @@ function getRotationPrecomputeL(precompute_L, rotationMatrix){
         result[i] = [];
     }
     for(let i = 0; i < 3; i++){
+
         let L_SH_R_3 = math.multiply([precompute_L[1][i], precompute_L[2][i], precompute_L[3][i]], shRotateMatrix3x3);
         let L_SH_R_5 = math.multiply([precompute_L[4][i], precompute_L[5][i], precompute_L[6][i], precompute_L[7][i], precompute_L[8][i]], shRotateMatrix5x5);
 
         result[0][i] = precompute_L[0][i];
+
         result[1][i] = L_SH_R_3._data[0];
         result[2][i] = L_SH_R_3._data[1];
         result[3][i] = L_SH_R_3._data[2];
-        result[4][i] = L_SH_R_5._data[0];
+        
+		result[4][i] = L_SH_R_5._data[0];
         result[5][i] = L_SH_R_5._data[1];
         result[6][i] = L_SH_R_5._data[2];
         result[7][i] = L_SH_R_5._data[3];
@@ -135,7 +138,7 @@ function mat4Matrix2mathMatrix(rotationMatrix){
 		}
 		mathMatrix.push(r);
 	}
-	return math.matrix(mathMatrix)
+	return math.transpose(mathMatrix)
 
 }
 
