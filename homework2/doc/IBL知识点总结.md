@@ -211,19 +211,111 @@ float4 ImportanceSampleGGX( float2 E, float a2 )
 
 ### 假设
 
+光源在无限远处，模型上的相对位置可以忽略，即，模型上所有点的坐标都为原点。
+
+类似于直接光照，根据Cook-Torrance BRDF模型可以将环境光照分为漫反射部分和镜面反射部分
+
+![image-20230523102837308](.\renderequation_cook_torrence_brdf.png)
+
 ### 漫反射部分
+
+![image-20230523102949657](D:\URPRJ\Games202\homework2\doc\diffuse_equation.png)
+
+$$k_d = (1 - k_s)(1 - metalness)$$
+
+$$ks = F(h,v)= F_0 +(1-F_0)(1-(h \cdot v))^5$$
+
+$$h = \frac{(w_o+w_i)}{|w_o+w_i|}$$
+
+等式h中包含有积分项（入射光方向）wi，无法进一步化简，所以做了近似。
+
+![image-20230523103516218](D:\URPRJ\Games202\homework2\doc\fresnel_approximation.png)
+
+得到
+
+![image-20230523103609302](D:\URPRJ\Games202\homework2\doc\diffuse_equation_approximation.png)
+
+所以我们只需要解决这个积分即可，而这个积分只与入射方向wi有关，我们可以在半球上采样预算出这一项，这就是`IrradianceMap`的来历。
 
 #### IrradianceMap
 
-#### Spherical Harmonics
+对于上述积分，我们可以采样蒙特卡洛积分的方法进行计算，选取均匀采样或者重要性采样皆可。
 
+对于均匀采样来说，$$pdf (\theta)= 1 / 0.5 \pi pdf(\phi) = 1/2\pi$$ 
 
+![image-20230524101740432](C:\Users\admin\AppData\Roaming\Typora\typora-user-images\image-20230524101740432.png)
+
+总之，我们在计算irradiance时，需要具体的法线信息n，需要根据法线信息在半球上随机分布入射方向wi，根据wi采样得到cubemap上的像素值作为Li，然后计算这个法线对应的irradiance，
+
+得到这样一张存储了irradiance的贴图后，我们就可以根据法线采样得到shadingpoint的环境光照强度了
+
+```c
+//计算L(n)
+for(normal &n: eachNormal)
+{
+    for(piexl &p: cubemap)
+    {
+        L(n) += p.color * dot(n,normalise(p.position));
+    }
+    L(n) /= smaplerNum;
+}
+//shader里面采样L(n)
+color = texture(diffuseMap,normalise(n)).xyz;
+```
 
 ### 镜面反射部分
 
+对于镜面反射部分，由于其brdf过于复杂，无法像漫反射那样简单的将brdf近似为常数，所以我们使用名为`Split-Sum`的方法，将积分拆成两部分
+
+![image-20230523105315803](D:\URPRJ\Games202\homework2\doc\intergration_approximation.png)
+
+![image-20230523105354999](D:\URPRJ\Games202\homework2\doc\render_equation_approximatin.png)
+
+我们将光照从积分中拆出去（对于后面的brdf函数来说，积分域较小，符合近似的条件）。这样我们就可以分别计算光照的积分和brdf的积分了。
+
 #### pre-filtered environment map
 
+对于前一项$$\frac{\int_\Omega L_i(p,w_i)dw_i}{\int_\Omega dw_i}$$来说，是对光照irradiance的加权平均，我们不能使用预计算漫反射的方式计算反射的光照，因为对于镜面反射来说，这个光照不仅仅与法线有关，还与我们的视角方向以及材质的粗糙度有关，所以做了一个假设，**令视角方向Wo=法线方向n=反射方向R**,这样后，我们将视角方向从方程中忽略了，只剩下反射方向和粗糙度。对于一个特定的粗糙度，我们用R预计算得到一张光照的贴图称之为`pre-filtered environment map`,一般我们会均匀的取粗糙度为 0, 0.25, 0.5, 0.75, 1.0，这样得到 5 个 cubemap，实时渲染时，利用R和粗糙度进行三线性插值。这里的R指定的视角方向的R，也即入射光的方向L
+
+对于R的计算，首先我们需要在随机采样半程向量H，然后利用公式计算得到，注意这里的计算均不假定向量是normalized
+
+![image-20230523114107209](D:\URPRJ\Games202\homework2\doc\calc_R.png)
+
+虚幻中，还对得到的光照进行了加权平均，以法线和L的夹角点乘为权重计算加权平均，意义是，两者越接近，其权重越大，光照计算的更亮。
+
+```
+vec3 R = n;
+vec3 V = w_o;
+for(int i = 0; i < N; i++)
+{
+    vec3 randNum = randFunction();
+    vec3 H = importanceSample(randNum,n);
+    vec3 L = normalize(2.0 * dot(V, H) * H - V);
+    color += texture(cubeMap,L).xyz * dot(n,L);
+    weight += dot(n,L);
+}
+color /= weight;
+```
+
+计算不同的roughness对应的贴图时，只需要根据roughness计算出不同的miplevel即可
+
+```c
+            float saSample = 1.0 / (float(SAMPLE_COUNT) * pdf + 0.0001);
+
+            float mipLevel = roughness == 0.0 ? 0.0 : 0.5 * log2(saSample / saTexel); 
+```
+
+这个假设之所以成立是因为，当物体材质是gloosy的时候，反射的波瓣较小，从不同的方向入射，反射方向都会集中在某一个区域内。
+
+带来的问题是，当从掠射角度看物体时，无法看到正确的图像。
+
 #### BRDF integration map
+
+对于后一项，其变量有视角方向Wo，法线方向N，粗糙度roughness以及F0，由于GGX是各向同性的，所以wo与wi与法线的角度是相同的。所以只需要一个角度$$\theta$$即可，这样变量剩下$$\theta$$， roughness和F0，我们可以作如下近似，这个可以将原来的公式乘以$$F/F$$，然后展开F得到
+
+![image-20230523114738590](D:\URPRJ\Games202\homework2\doc\brdf_int_approximation.png)
+
+观察公式，我们可以得到形如$$R_0 * A + B$$的形式，对于A和B，我们都消去了F项，也就是只剩下roughness和$$\theta$$两个变量，我们可以生成一张图，预存A和B，它们的计算可以用根据法线分布函数进行重要性采样的蒙特卡洛积分来解决。
 
 ## 参考文章
 
