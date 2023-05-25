@@ -15,10 +15,10 @@ varying highp float vDepth;
 
 float SimpleShadowMap(vec3 posWorld,float bias){
   vec4 posLight = vWorldToLight * vec4(posWorld, 1.0);
-  vec2 shadowCoord = clamp(posLight.xy * 0.5 + 0.5, vec2(0.0), vec2(1.0));
-  float depthSM = texture2D(uShadowMap, shadowCoord).x;
+  vec2 shadowCoord = clamp(posLight.xy * 0.5 + 0.5, vec2(0.0), vec2(1.0)); // 转换到投影空间下
+  float depthSM = texture2D(uShadowMap, shadowCoord).x; // 采样得到
   float depth = (posLight.z * 0.5 + 0.5) * 100.0;
-  return step(0.0, depthSM - depth + bias);
+  return step(0.0, depthSM - depth + bias); // x < 0.0 return 0.0; or return 1.0
 }
 
 void LocalBasis(vec3 n, out vec3 b1, out vec3 b2) {

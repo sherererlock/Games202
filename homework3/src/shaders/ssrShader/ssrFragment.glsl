@@ -121,9 +121,76 @@ vec3 GetGBufferDiffuse(vec2 uv) {
  * uv is in screen space, [0, 1] x [0, 1].
  *
  */
+
+ float DistributionGGX(vec3 N, vec3 H, float roughness)
+{
+    float a      = roughness*roughness;
+    float a2     = a*a;
+    float NdotH  = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH*NdotH;
+
+    float num   = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = M_PI * denom * denom;
+
+    return num / denom;
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+
+    float num   = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return num / denom;
+}
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2  = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1  = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0)
+{
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}  
+
 vec3 EvalDiffuse(vec3 wi, vec3 wo, vec2 uv) {
   vec3 L = vec3(0.0);
-  return L;
+
+  wi = normalize(wi);
+  wo = normalize(wo);
+
+  vec3 normal = GetGBufferNormalWorld(uv);
+  vec3 color = GetGBufferDiffuse(uv);
+
+  vec3 H = normalize(wi + wo);
+
+  float metallic= 0.2;
+  float roughness = 0.5;
+  vec3 F0 = mix(vec3(0.04), color, metallic);
+
+  vec3 F = fresnelSchlick(max(dot(H, wo), 0.0), F0);
+
+  float G = GeometrySmith(normal, wo, wi, roughness);
+  float NDF = DistributionGGX(normal, H, roughness);
+
+  vec3 kS = F;
+  vec3 kD = vec3(1.0) - kS;
+  kD *= (1.0 - metallic);
+
+  float denom = 4.0 * (max(dot(normal, wi), 0.0)) * max(dot(normal, wo), 0.0) + 0.0001;
+  vec3 nom = F * G * NDF;
+
+  vec3 specular = nom / denom;
+
+  return (kD * color * INV_PI + specular);
 }
 
 /*
@@ -132,7 +199,13 @@ vec3 EvalDiffuse(vec3 wi, vec3 wo, vec2 uv) {
  *
  */
 vec3 EvalDirectionalLight(vec2 uv) {
-  vec3 Le = vec3(0.0);
+
+  vec3 wi = normalize(uLightDir);
+  vec3 wo = normalize(uCameraPos - vPosWorld.xyz);
+  vec3 brdf = EvalDiffuse(wi, wo, uv);
+  float visibility = GetGBufferuShadow(uv);
+
+  vec3 Le = brdf * uLightRadiance.x * visibility;
   return Le;
 }
 
@@ -146,7 +219,9 @@ void main() {
   float s = InitRand(gl_FragCoord.xy);
 
   vec3 L = vec3(0.0);
-  L = GetGBufferDiffuse(GetScreenCoordinate(vPosWorld.xyz));
+  //L = GetGBufferDiffuse(GetScreenCoordinate(vPosWorld.xyz));
+
+  L = EvalDirectionalLight(GetScreenCoordinate(vPosWorld.xyz));
   vec3 color = pow(clamp(L, vec3(0.0), vec3(1.0)), vec3(1.0 / 2.2));
   gl_FragColor = vec4(vec3(color.rgb), 1.0);
 }
