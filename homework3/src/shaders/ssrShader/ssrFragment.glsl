@@ -209,7 +209,28 @@ vec3 EvalDirectionalLight(vec2 uv) {
   return Le;
 }
 
-bool RayMarch(vec3 ori, vec3 dir, out vec3 hitPos) {
+bool RayMarch(vec3 ori, vec3 dir, out vec3 hitPos) 
+{
+  float marchStep = 0.05;
+  const int maxStep = 30;
+
+  vec3 stepVec = dir * marchStep;
+  vec3 marchPos = ori;
+  for(int i = 0; i < maxStep; i ++)
+  {
+    vec2 uv = GetScreenCoordinate(marchPos);
+    float marchDepth = GetDepth(marchPos);
+    float depthInBuffer = GetGBufferDepth(uv);
+
+    if(marchDepth - depthInBuffer > 0.001)
+    {
+      hitPos = GetGBufferPosWorld(uv);
+      return true;
+    }
+
+    marchPos += stepVec;
+  }
+
   return false;
 }
 
@@ -218,10 +239,26 @@ bool RayMarch(vec3 ori, vec3 dir, out vec3 hitPos) {
 void main() {
   float s = InitRand(gl_FragCoord.xy);
 
+  vec2 uv = GetScreenCoordinate(vPosWorld.xyz);
   vec3 L = vec3(0.0);
   //L = GetGBufferDiffuse(GetScreenCoordinate(vPosWorld.xyz));
 
-  L = EvalDirectionalLight(GetScreenCoordinate(vPosWorld.xyz));
+  vec3 v2c = normalize(uCameraPos - vPosWorld.xyz);
+
+  vec3 normal = normalize(GetGBufferNormalWorld(uv));
+  vec3 dir = normalize(reflect(-v2c, normal));
+
+  L = EvalDirectionalLight(uv);
+
   vec3 color = pow(clamp(L, vec3(0.0), vec3(1.0)), vec3(1.0 / 2.2));
+
+  vec3 hitpos;
+  if(RayMarch(vPosWorld.xyz, dir, hitpos))
+  {
+    vec2 uv = GetScreenCoordinate(hitpos);
+
+    color = GetGBufferDiffuse(uv);
+  }
+
   gl_FragColor = vec4(vec3(color.rgb), 1.0);
 }
