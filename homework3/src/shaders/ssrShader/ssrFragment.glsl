@@ -172,7 +172,7 @@ vec3 EvalDiffuse(vec3 wi, vec3 wo, vec2 uv) {
 
   vec3 H = normalize(wi + wo);
 
-  float metallic= 0.2;
+  float metallic= 0.5;
   float roughness = 0.5;
   vec3 F0 = mix(vec3(0.04), color, metallic);
 
@@ -190,7 +190,15 @@ vec3 EvalDiffuse(vec3 wi, vec3 wo, vec2 uv) {
 
   vec3 specular = nom / denom;
 
-  return (kD * color * INV_PI + specular);
+  float ndotl =  max(dot(normal, wi), 0.0);
+  return (kD * color * INV_PI + specular) * ndotl;
+}
+
+vec3 EvalDiffuseLambertian(vec3 wi, vec3 wo, vec2 uv) {
+  vec3 albedo  = GetGBufferDiffuse(uv);
+  vec3 normal = GetGBufferNormalWorld(uv);
+  float cos = max(0., dot(normal, wi));
+  return albedo * cos * INV_PI;
 }
 
 /*
@@ -199,21 +207,14 @@ vec3 EvalDiffuse(vec3 wi, vec3 wo, vec2 uv) {
  *
  */
 vec3 EvalDirectionalLight(vec2 uv) {
-
-  vec3 wi = normalize(uLightDir);
-  vec3 worldpos = GetGBufferPosWorld(uv);
-  vec3 wo = normalize(uCameraPos - worldpos);
-  vec3 brdf = EvalDiffuse(wi, wo, uv);
   float visibility = GetGBufferuShadow(uv);
-
-  vec3 Le = brdf * uLightRadiance.x * visibility;
-  return Le;
+  return  uLightRadiance * visibility;
 }
 
 bool RayMarch(vec3 ori, vec3 dir, out vec3 hitPos) 
 {
   float marchStep = 0.05;
-  const int maxStep = 30;
+  const int maxStep = 50;
 
   vec3 stepVec = dir * marchStep;
   vec3 marchPos = ori;
@@ -235,31 +236,36 @@ bool RayMarch(vec3 ori, vec3 dir, out vec3 hitPos)
   return false;
 }
 
-vec3 EvalIndirectionalLight(vec2 uv, vec3 normal, vec3 dir) {
-  const int sampleCount = 20;
+vec3 EvalIndirectionalLight(vec2 uv, vec3 normal) {
+  const int sampleCount = 1;
 
   vec3 L = vec3(0.0);
   vec3 b1, b2;
   LocalBasis(normal, b1, b2);
-  mat3 local2world = mat3(b1, b2, normal);
-  vec3 wo = normalize(uCameraPos - vPosWorld.xyz);
 
+  mat3 local2world = mat3(b1, b2, normal);
+
+  vec3 wo = normalize(uCameraPos - vPosWorld.xyz);
+  vec3 wi = normalize(uLightDir);
+  
   for(int i = 0; i < sampleCount; i ++)
   {
     float s = InitRand(gl_FragCoord.xy);
     float pdf;
     vec3 localdir = SampleHemisphereCos(s, pdf);
     vec3 dir = normalize(local2world * localdir);
+
     vec3 hitpos;
     if(RayMarch(vPosWorld.xyz,dir, hitpos))
     {
       vec2 hituv = GetScreenCoordinate(hitpos);
-      vec3 color = EvalDirectionalLight(hituv);
-      float ndotl = dot(dir, normal);
-      // float ndotl = 1.0;
+      vec3 hitlight = EvalDirectionalLight(hituv);
+      vec3 hitbrdf = EvalDiffuse(wi, -dir, hituv);
+
+      vec3 le = hitlight * hitbrdf;
 
       vec3 brdf = EvalDiffuse(dir, wo, uv);
-      L += color * brdf * ndotl / pdf;
+      L += (le * brdf) / pdf;
     }
   }
 
@@ -270,25 +276,20 @@ vec3 EvalIndirectionalLight(vec2 uv, vec3 normal, vec3 dir) {
 
 void main() {
 
-  vec2 uv = GetScreenCoordinate(vPosWorld.xyz);
   vec3 L = vec3(0.0);
-  //L = GetGBufferDiffuse(GetScreenCoordinate(vPosWorld.xyz));
 
-  vec3 v2c = normalize(uCameraPos - vPosWorld.xyz);
+  vec2 uv = GetScreenCoordinate(vPosWorld.xyz);
 
+  // 直接光
+  vec3 wo = normalize(uCameraPos - vPosWorld.xyz);
+  vec3 wi = normalize(uLightDir);
+  vec3 brdf = EvalDiffuse(wi, wo, uv);
   vec3 normal = normalize(GetGBufferNormalWorld(uv));
-  vec3 dir = normalize(reflect(-v2c, normal));
+  vec3 directL = EvalDirectionalLight(uv) * brdf;
 
-  vec3 directL = EvalDirectionalLight(uv);
-
+  // 间接光
   vec3 indirectL = vec3(0.0);
-  vec3 hitpos;
-  if(RayMarch(vPosWorld.xyz, dir, hitpos))
-  {
-    vec2 uv = GetScreenCoordinate(hitpos);
-
-    indirectL = EvalIndirectionalLight(uv, normal, dir);
-  }
+  indirectL = EvalIndirectionalLight(uv, normal);
 
   L = directL + indirectL;
   vec3 color = pow(clamp(L, vec3(0.0), vec3(1.0)), vec3(1.0 / 2.2));
