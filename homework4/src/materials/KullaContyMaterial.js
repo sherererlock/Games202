@@ -7,6 +7,7 @@ class KullaContyMaterial extends Material {
             'uRoughness': { type: '1f', value: roughness },
             'uBRDFLut': { type: 'texture', value: BRDFLut },
             'uEavgFLut': { type: 'texture', value: EavgLut },
+            'uEavgLut': { type: 'texture', value: EavgLut },
             
             'uCubeTexture': { type: 'CubeTexture', value: null },
             'uLightRadiance': { type: '3fv', value: light.lightRadiance },
