@@ -1,3 +1,5 @@
+#version 300 es
+
 #ifdef GL_ES
 precision highp float;
 #endif
@@ -11,13 +13,23 @@ uniform sampler2D uGNormalWorld;
 uniform sampler2D uGShadow;
 uniform sampler2D uGPosWorld;
 
-varying mat4 vWorldToScreen;
-varying highp vec4 vPosWorld;
+uniform sampler2D uDepthTexture[12];
+
+// varying mat4 vWorldToScreen;
+// varying highp vec4 vPosWorld;
+
+in mat4 vWorldToScreen;
+in vec4 vPosWorld;
 
 #define M_PI 3.1415926535897932384626433832795
 #define TWO_PI 6.283185307
 #define INV_PI 0.31830988618
 #define INV_TWO_PI 0.15915494309
+
+#define MAX_MIPMAP_LEVEL 11
+#define MAX_THICKNESS 0.0017
+
+out vec4 FragColor;
 
 float Rand1(inout float p) {
   p = fract(p * .1031);
@@ -86,7 +98,7 @@ vec2 GetScreenCoordinate(vec3 posWorld) {
 }
 
 float GetGBufferDepth(vec2 uv) {
-  float depth = texture2D(uGDepth, uv).x;
+  float depth = texture(uGDepth, uv).x;
   if (depth < 1e-2) {
     depth = 1000.0;
   }
@@ -94,22 +106,22 @@ float GetGBufferDepth(vec2 uv) {
 }
 
 vec3 GetGBufferNormalWorld(vec2 uv) {
-  vec3 normal = texture2D(uGNormalWorld, uv).xyz;
+  vec3 normal = texture(uGNormalWorld, uv).xyz;
   return normal;
 }
 
 vec3 GetGBufferPosWorld(vec2 uv) {
-  vec3 posWorld = texture2D(uGPosWorld, uv).xyz;
+  vec3 posWorld = texture(uGPosWorld, uv).xyz;
   return posWorld;
 }
 
 float GetGBufferuShadow(vec2 uv) {
-  float visibility = texture2D(uGShadow, uv).x;
+  float visibility = texture(uGShadow, uv).x;
   return visibility;
 }
 
 vec3 GetGBufferDiffuse(vec2 uv) {
-  vec3 diffuse = texture2D(uGDiffuse, uv).xyz;
+  vec3 diffuse = texture(uGDiffuse, uv).xyz;
   diffuse = pow(diffuse, vec3(2.2));
   return diffuse;
 }
@@ -214,7 +226,7 @@ vec3 EvalDirectionalLight(vec2 uv) {
 bool RayMarch(vec3 ori, vec3 dir, out vec3 hitPos) 
 {
   float marchStep = 0.05;
-  const int maxStep = 50;
+  const int maxStep = 150;
 
   vec3 stepVec = dir * marchStep;
   vec3 marchPos = ori;
@@ -236,6 +248,202 @@ bool RayMarch(vec3 ori, vec3 dir, out vec3 hitPos)
   return false;
 }
 
+ivec2 getCellCount(int level){
+  if(level == 0){
+    return textureSize(uDepthTexture[0], level);
+  }
+  else if(level == 1){
+    return textureSize(uDepthTexture[1], level);
+  }
+  else if(level == 2){
+    return textureSize(uDepthTexture[2], level);
+  }
+    else if(level == 3){
+    return textureSize(uDepthTexture[3], level);
+  }
+    else if(level == 4){
+    return textureSize(uDepthTexture[4], level);
+  }
+    else if(level == 5){
+    return textureSize(uDepthTexture[5], level);
+  }
+    else if(level == 6){
+    return textureSize(uDepthTexture[6], level);
+  }
+    else if(level == 7){
+    return textureSize(uDepthTexture[7], level);
+  }
+    else if(level == 8){
+    return textureSize(uDepthTexture[8], level);
+  }
+    else if(level == 9){
+    return textureSize(uDepthTexture[9], level);
+  }
+    else if(level == 10){
+    return textureSize(uDepthTexture[10], level);
+  }
+    else if(level == 11){
+    return textureSize(uDepthTexture[11], level);
+  }
+
+  return textureSize(uDepthTexture[0], level);
+}
+
+ivec2 getCell(vec2 pos, ivec2 startCellCount){
+ return ivec2(floor(pos*vec2(startCellCount)));
+}
+
+vec3 intersectDepthPlane(vec3 o, vec3 d, float t){
+    return o + d * t;
+}
+
+vec3 intersectCellBoundary(vec3 o, vec3 d, ivec2 rayCell, ivec2 cell_count, vec2 crossStep, vec2 crossOffset){
+    	vec3 intersection = vec3(0.);
+	
+      vec2 index = vec2(rayCell) + crossStep;
+      vec2 boundary = index / vec2(cell_count);
+      boundary += crossOffset;
+      
+      vec2 delta = boundary - o.xy;
+      delta /= d.xy;
+      float t = min(delta.x, delta.y);
+      
+      intersection = intersectDepthPlane(o, d, t);
+      
+      return intersection;
+}
+
+float getMinimumDepthPlane(vec2 pos, int level){
+  vec2 cellCount = vec2(getCellCount(level));
+  ivec2 cell = ivec2(floor(pos * cellCount));
+
+  if(level == 0){
+    return texelFetch(uDepthTexture[0], cell, 0).x;
+  }
+  else if(level == 1){
+    return texelFetch(uDepthTexture[1], cell, 0).x;
+  }
+  else if(level == 2){
+    return texelFetch(uDepthTexture[2], cell, 0).x;
+  }
+    else if(level == 3){
+    return texelFetch(uDepthTexture[3], cell, 0).x;
+  }
+    else if(level == 4){
+    return texelFetch(uDepthTexture[4], cell, 0).x;
+  }
+    else if(level == 5){
+    return texelFetch(uDepthTexture[5], cell, 0).x;
+  }
+    else if(level == 6){
+    return texelFetch(uDepthTexture[6], cell, 0).x;
+  }
+    else if(level == 7){
+    return texelFetch(uDepthTexture[7], cell, 0).x;
+  }
+    else if(level == 8){
+    return texelFetch(uDepthTexture[8], cell, 0).x;
+  }
+    else if(level == 9){
+    return texelFetch(uDepthTexture[9], cell, 0).x;
+  }
+    else if(level == 10){
+    return texelFetch(uDepthTexture[10], cell, 0).x;
+  }
+    else if(level == 11){
+    return texelFetch(uDepthTexture[11], cell, 0).x;
+  }
+
+    return texelFetch(uDepthTexture[0], cell, 0).x;
+}
+
+bool crossedCellBoundary(ivec2 oldCellIdx,ivec2 newCellIdx){
+    return (oldCellIdx.x!=newCellIdx.x)||(oldCellIdx.y!=newCellIdx.y);
+}
+
+bool RayMarch_Hiz_In_Texture_Space(vec3 start, vec3 rayDir,float maxTraceDistance, out vec3 hitPos){
+    vec2 crossStep = vec2(rayDir.x >= 0. ? 1 : -1, rayDir.y >= 0. ? 1 : -1);
+    // vec2 crossOffset = crossStep / vec2(1024.0, 1024.0) / 128.;
+    vec2 crossOffset = crossStep / vec2(2560.0,1440.0) / 128.;
+    crossStep = clamp(crossStep, 0.0, 1.0);
+
+    vec3 ray = start;
+    float minZ = ray.z;
+    float maxZ = ray.z + rayDir.z * maxTraceDistance;
+    float deltaZ = (maxZ - minZ);
+
+    vec3 o = ray;
+    vec3 d = rayDir * maxTraceDistance;
+
+    int startLevel = 0;
+    int stopLevel = 0;
+    ivec2 startCellCount = getCellCount(startLevel);
+
+
+    ivec2 rayCell = getCell(ray.xy, startCellCount);
+    ray = intersectCellBoundary(o, d, rayCell, startCellCount, crossStep, crossOffset * 64.);
+
+    int level = startLevel;
+    int iter = 0;
+    bool isBackwardRay = rayDir.z < 0.;
+
+    float Dir = isBackwardRay ? -1. : 1.;
+
+    while( level >= stopLevel && ray.z * Dir <= maxZ * Dir && iter < 100){
+        ivec2 cellCount = getCellCount(level);
+        ivec2 oldCellIdx = getCell(ray.xy, cellCount);
+
+        float cell_minZ = getMinimumDepthPlane(ray.xy, level);
+
+        vec3 tmpRay = ((cell_minZ > ray.z) && !isBackwardRay) ? intersectDepthPlane(o, d, (cell_minZ - minZ) / deltaZ) : ray;
+
+        ivec2 newCellIdx = getCell(tmpRay.xy, cellCount);
+
+        float thickness = level == 0 ? (ray.z - cell_minZ) : 0.;
+        bool crossed  = (isBackwardRay && (cell_minZ > ray.z))||(thickness > MAX_THICKNESS)|| crossedCellBoundary(oldCellIdx, newCellIdx);
+        ray = crossed ? intersectCellBoundary(o, d, oldCellIdx, cellCount, crossStep, crossOffset) : tmpRay;
+
+        level = crossed ? min(MAX_MIPMAP_LEVEL, level + 1): level - 1;
+        ++iter;
+    }
+    bool intersected = (level < stopLevel);
+    intersected = true;
+    hitPos = intersected ? ray : vec3(0.0);
+    return intersected;
+}
+
+bool RayMarch_Hiz(vec3 ori, vec3 dir, out vec3 hitPos) {
+    float step = 0.05;
+    float maxDistance = 7.5;
+
+    int startLevel = 2;
+    int stopLevel = 0;
+
+    vec3 curPos = ori;
+    int level = startLevel;
+    while(level >= stopLevel && distance(ori, curPos) < maxDistance){
+        float rayDepth = GetDepth(curPos);
+        vec2 screenUV = GetScreenCoordinate(curPos);
+        float gBufferDepth = getMinimumDepthPlane(screenUV, level);
+
+        if(rayDepth - gBufferDepth > 0.0001){
+          if(level == 0){
+            hitPos = curPos;
+            return true;
+          }
+          else{
+            level = level - 1;
+          }
+        }
+        else{
+          level = min(MAX_MIPMAP_LEVEL, level + 1);
+          vec3 stepDistance = (dir * step * float(level + 1));
+          curPos += stepDistance;
+        }
+    }
+    return false;
+}
+
 vec3 EvalIndirectionalLight(vec2 uv, vec3 normal) {
   const int sampleCount = 1;
 
@@ -247,6 +455,8 @@ vec3 EvalIndirectionalLight(vec2 uv, vec3 normal) {
 
   vec3 wo = normalize(uCameraPos - vPosWorld.xyz);
   vec3 wi = normalize(uLightDir);
+
+   vec3 dir1 = normalize(reflect(-wo, normal));
   
   for(int i = 0; i < sampleCount; i ++)
   {
@@ -256,6 +466,9 @@ vec3 EvalIndirectionalLight(vec2 uv, vec3 normal) {
     vec3 dir = normalize(local2world * localdir);
 
     vec3 hitpos;
+    // dir = dir1;
+    // pdf = 1.0;
+    // if(RayMarch_Hiz(vPosWorld.xyz,dir, hitpos))
     if(RayMarch(vPosWorld.xyz,dir, hitpos))
     {
       vec2 hituv = GetScreenCoordinate(hitpos);
@@ -272,7 +485,7 @@ vec3 EvalIndirectionalLight(vec2 uv, vec3 normal) {
   return L / float(sampleCount);
 }
 
-#define SAMPLE_NUM 1
+#define SAMPLE_NUM 100
 
 void main() {
 
@@ -293,5 +506,6 @@ void main() {
 
   L = directL + indirectL;
   vec3 color = pow(clamp(L, vec3(0.0), vec3(1.0)), vec3(1.0 / 2.2));
-  gl_FragColor = vec4(vec3(color.rgb), 1.0);
+
+  FragColor = vec4(color, 1.0);
 }

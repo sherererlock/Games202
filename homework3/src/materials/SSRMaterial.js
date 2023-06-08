@@ -1,10 +1,9 @@
 class SSRMaterial extends Material {
     constructor(diffuseMap, specularMap, light, camera, vertexShader, fragmentShader) {
         let lightIntensity = light.mat.GetIntensity();
-        let lightVP = light.CalcLightVP();
         let lightDir = light.CalcShadingDirection();
 
-        super({
+        let uniforms = {
             'uLightRadiance': { type: '3fv', value: lightIntensity },
             'uLightDir': { type: '3fv', value: lightDir },
 
@@ -13,7 +12,14 @@ class SSRMaterial extends Material {
             'uGNormalWorld': { type: 'texture', value: camera.fbo.textures[2] },
             'uGShadow': { type: 'texture', value: camera.fbo.textures[3] },
             'uGPosWorld': { type: 'texture', value: camera.fbo.textures[4] },
-        }, [], vertexShader, fragmentShader);
+        };
+
+        for (let i = 0; i < mipMapLevel; i ++)
+        {
+            uniforms['uDepthTexture' + '[' + i + ']'] = { type: 'texture', value: null };
+        }
+
+        super(uniforms, [], vertexShader, fragmentShader);
     }
 }
 
