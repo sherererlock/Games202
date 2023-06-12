@@ -73,6 +73,7 @@ float GeometrySmith(float roughness, float NoV, float NoL) {
     return ggx1 * ggx2;
 }
 
+// V(sin, 0, cos)
 Vec3f IntegrateBRDF(Vec3f V, float roughness, float NdotV) {
     float A = 0.0;
     float B = 0.0;
@@ -117,6 +118,7 @@ int main() {
             data[(i * resolution + j) * 3 + 2] = uint8_t(irr.z * 255.0);
         }
     }
+
     stbi_flip_vertically_on_write(true);
     stbi_write_png("GGX_E_MC_LUT.png", resolution, resolution, 3, data, resolution * 3);
     
