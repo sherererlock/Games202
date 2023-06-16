@@ -1,4 +1,10 @@
+#include <cmath>
+#include <algorithm>
+
 #include "denoiser.h"
+#include "util/mathutil.h"
+
+#define M_PI 3.14159265358979323846 // pi
 
 Denoiser::Denoiser() : m_useTemportal(false) {}
 
@@ -37,16 +43,72 @@ void Denoiser::TemporalAccumulation(const Buffer2D<Float3> &curFilteredColor) {
     std::swap(m_misc, m_accColor);
 }
 
+Float3 Denoiser::JointBilateralFilter(int kernelRadius, int pixelx, int pixely,
+                              const FrameInfo &frameInfo) {
+
+    auto DPlane = [](Float3 normal, Float3 position1, Float3 position2) -> float {
+        float v = Dot(normal, Normalize(position1 - position2));
+        return v * v;
+    };
+
+    auto DNormal = [](Float3 normal1, Float3 normal2) {
+        float v = SafeAcos(Dot(normal1, normal2));
+        return v * v;
+    };
+
+    auto Exponent = [](float difference, float sigma) {
+        float sigma2 = Sqr(sigma);
+        float exponent = exp(-difference / (2.0f * sigma2));
+        return exponent;
+    };
+
+    Float3 position = (pixelx, pixely, 0.0f);
+    Float3 color = frameInfo.m_beauty(pixelx, pixely);
+    Float3 normal = frameInfo.m_normal(pixelx, pixely);
+    float depth = frameInfo.m_depth(pixelx, pixely);
+    Float3 precolor = m_preFrameInfo.m_beauty(pixelx, pixely);
+
+    int pad = floor(kernelRadius / 2.0f);
+    Float3 sumOfWightedValue = 0.0f;
+    float sumofWeight = 0.0f;
+
+    for (int i = 0; i < kernelRadius; i ++) 
+    {
+        int x = std::clamp(i - pad, 0, kernelRadius);
+        for (int j = 0; j < kernelRadius; j ++)
+        {
+            int y = std::clamp(j - pad, 0, kernelRadius);
+
+            Float3 positionj = (x, y, 0.0f);
+            Float3 colorj = frameInfo.m_beauty(x, y);
+            Float3 normalj = frameInfo.m_normal(x, y);
+            float depthj = frameInfo.m_depth(x, y);
+
+            float weightCoord = Exponent(SqrLength(position - positionj), m_sigmaCoord);
+            float weightColor = Exponent(SqrLength(color - colorj), m_sigmaColor);
+            float dnormal = Exponent(DNormal(normal, normalj), m_sigmaNormal);
+            float dplane = Exponent(DPlane(normal, position, positionj), m_sigmaPlane);
+
+            float weight = (weightCoord * weightColor * dnormal * dplane);
+            sumOfWightedValue += color * weight;
+            sumofWeight += weight;
+        }
+    }
+
+    return sumOfWightedValue / sumofWeight;
+}
+
 Buffer2D<Float3> Denoiser::Filter(const FrameInfo &frameInfo) {
     int height = frameInfo.m_beauty.m_height;
     int width = frameInfo.m_beauty.m_width;
     Buffer2D<Float3> filteredImage = CreateBuffer2D<Float3>(width, height);
     int kernelRadius = 16;
-#pragma omp parallel for
+    
+//#pragma omp parallel for
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             // TODO: Joint bilateral filter
-            filteredImage(x, y) = frameInfo.m_beauty(x, y);
+            filteredImage(x, y) = JointBilateralFilter(kernelRadius, x, y, frameInfo);
         }
     }
     return filteredImage;
