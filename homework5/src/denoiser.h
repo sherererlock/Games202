@@ -26,7 +26,10 @@ class Denoiser {
     void Maintain(const FrameInfo &frameInfo);
 
     void Reprojection(const FrameInfo &frameInfo);
-    void TemporalAccumulation(const Buffer2D<Float3> &curFilteredColor);
+
+    void CalcMeanAndVariance(const FrameInfo &frameInfo, int x, int y, int kernelRadius, Float3& mean, Float3& Variance);
+
+    void TemporalAccumulation(const FrameInfo &frameInfo, const Buffer2D<Float3> &curFilteredColor);
 
     Float3 JointBilateralFilter(int kernelRadius, int pixelx, int pixely,
                         const FrameInfo &frameInfo);

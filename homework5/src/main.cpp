@@ -40,7 +40,7 @@ FrameInfo LoadFrameInfo(const filesystem::path &inputDir, const int &idx) {
 void Denoise(const filesystem::path &inputDir, const filesystem::path &outputDir,
              const int &frameNum) {
     Denoiser denoiser;
-    for (int i = 0; i < frameNum; i++) {
+    for (int i = 0; i < 1; i++) {
         std::cout << "Frame: " << i << std::endl;
         FrameInfo frameInfo = LoadFrameInfo(inputDir, i);
         Buffer2D<Float3> image = denoiser.ProcessFrame(frameInfo);
