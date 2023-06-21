@@ -33,15 +33,18 @@ void Denoiser::Reprojection(const FrameInfo &frameInfo) {
             Matrix4x4 prem2s = preWorldToScreen * prem2w * w2m;
 
             Float3 position = frameInfo.m_position(x, y);
-            Float3 screenPos = prem2s(position, Float3::EType::Point);
+            Float3 screenPos = prem2s(position, Float3::EType::Point); // 上一帧屏幕上的位置
 
             if (screenPos.x < 0 || screenPos.x > width || screenPos.y < 0 || screenPos.y > height)
                 continue;
 
-            float preid = m_preFrameInfo.m_id((int)screenPos.x, (int)screenPos.y);// 当前像素上一帧物体id
+            float preid = m_preFrameInfo.m_id((int)screenPos.x, (int)screenPos.y);// 上一帧像素对应的物体标号
             if (preid == id) {
                 m_valid(x, y) = true;
                 m_misc(x, y) = m_accColor((int)screenPos.x, (int)screenPos.y);
+            } else {
+                m_valid(x, y) = false;
+                m_misc(x, y) = Float3(0.0f);
             }
         }
     }
@@ -92,19 +95,26 @@ void Denoiser::TemporalAccumulation(const Buffer2D<Float3> &curFilteredColor) {
             Float3 color = m_accColor(x, y); // 上一帧的color
 
             bool valid = m_valid(x, y);
-            if (valid) {
+            if (valid)
+            {
                 alpha = m_alpha;
 
                 Float3 mean;
                 Float3 Variance;
                 CalcMeanAndVariance(curFilteredColor, x, y, kernelRadius, mean, Variance);
+                Variance = SafeSqrt(Variance);
 
                 color = Clamp(color, mean - Variance * m_colorBoxK, mean + Variance * m_colorBoxK);
+            } 
+            else
+            {
+                color = curFilteredColor(x, y);
             }
 
             m_misc(x, y) = Lerp(color, curFilteredColor(x, y), alpha);
         }
     }
+
     std::swap(m_misc, m_accColor);
 }
 
