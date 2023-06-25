@@ -31,6 +31,10 @@ class Denoiser {
 
     void TemporalAccumulation(const Buffer2D<Float3> &curFilteredColor);
 
+    void CalcWeightedColorAndWeight(const FrameInfo &frameInfo, const Float3 &color,
+                                    const Float3 &normal, const Float3 &position, int x,
+                                    int y, Float3 &sumWeightedColor, float &sumWeight);
+
     Float3 JointBilateralFilter(int kernelRadius, int pixelx, int pixely,
                         const FrameInfo &frameInfo);
     Buffer2D<Float3> Filter(const FrameInfo &frameInfo);

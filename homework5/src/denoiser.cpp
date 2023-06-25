@@ -118,9 +118,10 @@ void Denoiser::TemporalAccumulation(const Buffer2D<Float3> &curFilteredColor) {
     std::swap(m_misc, m_accColor);
 }
 
-Float3 Denoiser::JointBilateralFilter(int kernelRadius, int pixelx, int pixely,
-                              const FrameInfo &frameInfo) {
-
+void Denoiser::CalcWeightedColorAndWeight(const FrameInfo &frameInfo, const Float3 &color,
+                                          const Float3 &normal, const Float3 &position,
+                                          int x, int y, Float3 &sumWeightedColor, float& sumWeight)
+{
     auto DPlane = [](Float3 normal, Float3 position1, Float3 position2) -> float {
         Float3 vec = position1 - position2;
         if (Length(vec) == 0.0f)
@@ -139,7 +140,29 @@ Float3 Denoiser::JointBilateralFilter(int kernelRadius, int pixelx, int pixely,
         return -difference / (2.0f * Sqr(sigma));
     };
 
-    Float3 position = (pixelx, pixely, 0.0f);
+    //Float3 positionj = (x, y, 0.0f);
+    Float3 positionj = frameInfo.m_position(x, y);
+    Float3 colorj = frameInfo.m_beauty(x, y);
+    Float3 normalj = frameInfo.m_normal(x, y);
+    float depthj = frameInfo.m_depth(x, y);
+
+    float CoordCoe = ExponentCoe(SqrLength(position - positionj), m_sigmaCoord);
+    float ColorCoe = ExponentCoe(SqrLength(color - colorj), m_sigmaColor);
+    float dnormal = ExponentCoe(DNormal(normal, normalj), m_sigmaNormal);
+    float dplane = ExponentCoe(DPlane(normal, position, positionj), m_sigmaPlane);
+
+    // std::cout << "(" << x << "," << y << ")";
+    float weight = std::exp(CoordCoe + ColorCoe + dnormal + dplane);
+
+    sumWeightedColor += colorj * weight;
+    sumWeight += weight;
+}
+
+Float3 Denoiser::JointBilateralFilter(int kernelRadius, int pixelx, int pixely,
+                              const FrameInfo &frameInfo) {
+
+    //Float3 position = (pixelx, pixely, 0.0f);
+    Float3 position = frameInfo.m_position(pixelx, pixely);
     Float3 color = frameInfo.m_beauty(pixelx, pixely);
     Float3 normal = frameInfo.m_normal(pixelx, pixely);
     float depth = frameInfo.m_depth(pixelx, pixely);
@@ -162,21 +185,7 @@ Float3 Denoiser::JointBilateralFilter(int kernelRadius, int pixelx, int pixely,
             if (y < 0)
                 continue;
 
-            Float3 positionj = (x, y, 0.0f);
-            Float3 colorj = frameInfo.m_beauty(x, y);
-            Float3 normalj = frameInfo.m_normal(x, y);
-            float depthj = frameInfo.m_depth(x, y);
-
-            float CoordCoe = ExponentCoe(SqrLength(position - positionj), m_sigmaCoord);
-            float ColorCoe = ExponentCoe(SqrLength(color - colorj), m_sigmaColor);
-            float dnormal = ExponentCoe(DNormal(normal, normalj), m_sigmaNormal);
-            float dplane = ExponentCoe(DPlane(normal, position, positionj), m_sigmaPlane);
-
-            //std::cout << "(" << x << "," << y << ")";
-            float weight = std::exp(CoordCoe + ColorCoe + dnormal + dplane);
-
-            sumOfWightedValue += colorj * weight;
-            sumofWeight += weight;
+            CalcWeightedColorAndWeight(frameInfo, color, normal, position, x, y, sumOfWightedValue, sumofWeight);
         }
     }
 

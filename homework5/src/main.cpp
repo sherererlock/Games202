@@ -58,8 +58,8 @@ int main() {
 
     
     // Pink room
-    filesystem::path inputDir("examples/pink-room/input");
-    filesystem::path outputDir("examples/pink-room/output");
+    filesystem::path inputDir("../examples/pink-room/input");
+    filesystem::path outputDir("../examples/pink-room/output");
     int frameNum = 80;
     
 
